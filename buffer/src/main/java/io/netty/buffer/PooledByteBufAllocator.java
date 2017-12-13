@@ -22,7 +22,6 @@ import io.netty.util.concurrent.FastThreadLocalThread;
 import io.netty.util.internal.PlatformDependent;
 import io.netty.util.internal.StringUtil;
 import io.netty.util.internal.SystemPropertyUtil;
-import io.netty.util.internal.ThreadCleaner;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
 
@@ -437,27 +436,10 @@ public class PooledByteBufAllocator extends AbstractByteBufAllocator implements 
             final PoolArena<ByteBuffer> directArena = leastUsedArena(directArenas);
 
             Thread current = Thread.currentThread();
-            boolean fastThread = current instanceof FastThreadLocalThread;
             if (useCacheForAllThreads || current instanceof FastThreadLocalThread) {
-                // If our FastThreadLocalThread will call FastThreadLocal.removeAll() we not need to use
-                // the ThreadCleaner to release memory from the PoolThreadCache once the Thread dies.
-                boolean needsCleanupOnGC = fastThread ?
-                        !((FastThreadLocalThread) current).willCleanupFastThreadLocals() : true;
-                final PoolThreadCache cache = new PoolThreadCache(
+                return new PoolThreadCache(
                         heapArena, directArena, tinyCacheSize, smallCacheSize, normalCacheSize,
                         DEFAULT_MAX_CACHED_BUFFER_CAPACITY, DEFAULT_CACHE_TRIM_INTERVAL);
-
-                if (needsCleanupOnGC) {
-                    // The thread-local cache will keep a list of pooled buffers which must be returned to
-                    // the pool when the thread is not alive anymore.
-                    ThreadCleaner.register(Thread.currentThread(), new Runnable() {
-                        @Override
-                        public void run() {
-                            cache.free();
-                        }
-                    });
-                }
-                return cache;
             }
             // No caching so just use 0 as sizes.
             return new PoolThreadCache(heapArena, directArena, 0, 0, 0, 0, 0);

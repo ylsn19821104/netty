@@ -17,6 +17,7 @@ package io.netty.util.concurrent;
 
 import io.netty.util.internal.InternalThreadLocalMap;
 import io.netty.util.internal.PlatformDependent;
+import io.netty.util.internal.ThreadCleaner;
 
 import java.util.Collections;
 import java.util.IdentityHashMap;
@@ -57,18 +58,22 @@ public class FastThreadLocal<V> {
         }
 
         try {
-            Object v = threadLocalMap.indexedVariable(variablesToRemoveIndex);
-            if (v != null && v != InternalThreadLocalMap.UNSET) {
-                @SuppressWarnings("unchecked")
-                Set<FastThreadLocal<?>> variablesToRemove = (Set<FastThreadLocal<?>>) v;
-                FastThreadLocal<?>[] variablesToRemoveArray =
-                        variablesToRemove.toArray(new FastThreadLocal[variablesToRemove.size()]);
-                for (FastThreadLocal<?> tlv: variablesToRemoveArray) {
-                    tlv.remove(threadLocalMap);
-                }
-            }
+            removeAll(threadLocalMap);
         } finally {
             InternalThreadLocalMap.remove();
+        }
+    }
+
+    private static void removeAll(InternalThreadLocalMap threadLocalMap) {
+        Object v = threadLocalMap.indexedVariable(variablesToRemoveIndex);
+        if (v != null && v != InternalThreadLocalMap.UNSET) {
+            @SuppressWarnings("unchecked")
+            Set<FastThreadLocal<?>> variablesToRemove = (Set<FastThreadLocal<?>>) v;
+            FastThreadLocal<?>[] variablesToRemoveArray =
+                    variablesToRemove.toArray(new FastThreadLocal[variablesToRemove.size()]);
+            for (FastThreadLocal<?> tlv: variablesToRemoveArray) {
+                tlv.remove(threadLocalMap);
+            }
         }
     }
 
@@ -131,8 +136,30 @@ public class FastThreadLocal<V> {
     /**
      * Returns the current value for the current thread
      */
+    @SuppressWarnings("unchecked")
     public final V get() {
-        return get(InternalThreadLocalMap.get());
+        final InternalThreadLocalMap threadLocalMap = InternalThreadLocalMap.get();
+        Object v = threadLocalMap.indexedVariable(index);
+        if (v != InternalThreadLocalMap.UNSET) {
+            return (V) v;
+        }
+
+        V value = initialize(threadLocalMap);
+        Thread current = Thread.currentThread();
+        if (!FastThreadLocalThread.willCleanupFastThreadLocals(current)) {
+            // We will need to ensure we will trigger remove(InternalThreadLocalMap) so everything will be released
+            // and FastThreadLocal.onRemoval(...) will be called.
+            ThreadCleaner.register(current, new Runnable() {
+                @Override
+                public void run() {
+                    remove(threadLocalMap);
+
+                    // It's fine to not call InternalThreadLocalMap.remove() here as this will only be triggered once
+                    // the Thread is collected by GC. In this case the ThreadLocal will be gone away already.
+                }
+            });
+        }
+        return value;
     }
 
     /**
