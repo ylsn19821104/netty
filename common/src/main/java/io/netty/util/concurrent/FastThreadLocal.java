@@ -58,22 +58,18 @@ public class FastThreadLocal<V> {
         }
 
         try {
-            removeAll(threadLocalMap);
+            Object v = threadLocalMap.indexedVariable(variablesToRemoveIndex);
+            if (v != null && v != InternalThreadLocalMap.UNSET) {
+                @SuppressWarnings("unchecked")
+                Set<FastThreadLocal<?>> variablesToRemove = (Set<FastThreadLocal<?>>) v;
+                FastThreadLocal<?>[] variablesToRemoveArray =
+                        variablesToRemove.toArray(new FastThreadLocal[variablesToRemove.size()]);
+                for (FastThreadLocal<?> tlv: variablesToRemoveArray) {
+                    tlv.remove(threadLocalMap);
+                }
+            }
         } finally {
             InternalThreadLocalMap.remove();
-        }
-    }
-
-    private static void removeAll(InternalThreadLocalMap threadLocalMap) {
-        Object v = threadLocalMap.indexedVariable(variablesToRemoveIndex);
-        if (v != null && v != InternalThreadLocalMap.UNSET) {
-            @SuppressWarnings("unchecked")
-            Set<FastThreadLocal<?>> variablesToRemove = (Set<FastThreadLocal<?>>) v;
-            FastThreadLocal<?>[] variablesToRemoveArray =
-                    variablesToRemove.toArray(new FastThreadLocal[variablesToRemove.size()]);
-            for (FastThreadLocal<?> tlv: variablesToRemoveArray) {
-                tlv.remove(threadLocalMap);
-            }
         }
     }
 

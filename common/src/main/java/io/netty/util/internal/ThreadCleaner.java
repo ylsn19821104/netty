@@ -87,7 +87,7 @@ public final class ThreadCleaner {
         if (CLEANER_RUNNING.compareAndSet(false, true)) {
             Thread cleanupThread = new Thread(CLEANER_TASK);
             cleanupThread.setPriority(Thread.MIN_PRIORITY);
-            // Set to null to ensure we not create classloader leaks by holds a strong reference to the inherited
+            // Set to null to ensure we not create classloader leaks by holding a strong reference to the inherited
             // classloader.
             // See:
             // - https://github.com/netty/netty/issues/7290
@@ -95,8 +95,9 @@ public final class ThreadCleaner {
             cleanupThread.setContextClassLoader(null);
             cleanupThread.setName("ThreadCleanerReaper");
 
-            // This Thread is not a daemon as it will die once all references to the registered Threads will go away.
-            cleanupThread.setDaemon(false);
+            // This Thread is not a daemon as it will die once all references to the registered Threads will go away
+            // and its important to always invoke all cleanup tasks as these may free up memory etc.
+            cleanupThread.setDaemon(true);
             cleanupThread.start();
         }
     }
