@@ -16,15 +16,12 @@
 package io.netty.example.discard;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelFutureListener;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.channel.*;
 
 /**
  * Handles a client-side channel.
  */
-public class DiscardClientHandler extends SimpleChannelInboundHandler<Object> {
+public class DiscardClientHandler extends ChannelInboundHandlerAdapter {
 
     private ByteBuf content;
     private ChannelHandlerContext ctx;
@@ -43,11 +40,6 @@ public class DiscardClientHandler extends SimpleChannelInboundHandler<Object> {
     @Override
     public void channelInactive(ChannelHandlerContext ctx) {
         content.release();
-    }
-
-    @Override
-    public void channelRead0(ChannelHandlerContext ctx, Object msg) throws Exception {
-        // Server is supposed to send nothing, but if it sends something, discard it.
     }
 
     @Override
